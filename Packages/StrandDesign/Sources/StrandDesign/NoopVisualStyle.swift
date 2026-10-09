@@ -13,19 +13,19 @@ public enum NoopVisualStyle {
 
     // Neutral, low-chroma surfaces sampled from the supplied dark-mode reference. Each also carries the
     // Claude (warm charcoal) and Grok (near-black) dark values used while a terminal theme is active.
-    public static let canvas = Color(light: "#F3F4F6", dark: "#1D1E23", claude: "#1F1E1D", grok: "#0A0A0A")
-    public static let surface = Color(light: "#FFFFFF", dark: "#2A2C34", claude: "#2B2A27", grok: "#161514")
-    public static let surfaceTop = Color(light: "#FFFFFF", dark: "#30323B", claude: "#30302E", grok: "#1C1B19")
-    public static let surfaceBottom = Color(light: "#F4F5F7", dark: "#282A31", claude: "#282724", grok: "#141312")
-    public static let inset = Color(light: "#E8E9ED", dark: "#23252C", claude: "#1A1918", grok: "#0F0E0D")
+    public static let canvas = Color(light: "#F3F4F6", dark: "#1D1E23", claude: "#151413", grok: "#000000")
+    public static let surface = Color(light: "#FFFFFF", dark: "#2A2C34", claude: "#1C1B1A", grok: "#0B0B0B")
+    public static let surfaceTop = Color(light: "#FFFFFF", dark: "#30323B", claude: "#1E1D1C", grok: "#0C0C0C")
+    public static let surfaceBottom = Color(light: "#F4F5F7", dark: "#282A31", claude: "#1A1918", grok: "#0A0A0A")
+    public static let inset = Color(light: "#E8E9ED", dark: "#23252C", claude: "#232220", grok: "#141414")
 
-    public static let border = Color(light: "#D8DAE0", dark: "#373A44", claude: "#3E3D39", grok: "#2C2924")
-    public static let borderHighlight = Color(light: "#FFFFFF", dark: "#4B4E59", claude: "#52504A", grok: "#3D3830")
-    public static let divider = Color(light: "#E4E5E9", dark: "#383A43", claude: "#3A3935", grok: "#26231F")
+    public static let border = Color(light: "#D8DAE0", dark: "#373A44", claude: "#34322E", grok: "#262626")
+    public static let borderHighlight = Color(light: "#FFFFFF", dark: "#4B4E59", claude: "#3C3A35", grok: "#2C2C2C")
+    public static let divider = Color(light: "#E4E5E9", dark: "#383A43", claude: "#2C2A27", grok: "#1F1F1F")
 
-    public static let primaryText = Color(light: "#17181C", dark: "#F7F7FA", claude: "#F5F4EE", grok: "#F3EEE3")
-    public static let secondaryText = Color(light: "#555861", dark: "#C3C4CA", claude: "#C2C0B6", grok: "#BDB4A2")
-    public static let tertiaryText = Color(light: "#7D808A", dark: "#7D7F88", claude: "#85837B", grok: "#7C7466")
+    public static let primaryText = Color(light: "#17181C", dark: "#F7F7FA", claude: "#F2F0E8", grok: "#EDEDED")
+    public static let secondaryText = Color(light: "#555861", dark: "#C3C4CA", claude: "#B8B5AA", grok: "#A3A3A3")
+    public static let tertiaryText = Color(light: "#7D808A", dark: "#7D7F88", claude: "#7F7C73", grok: "#6B6B6B")
 
     public static let mint = Color(light: "#149A78", dark: "#69DDB8")
     public static let mintDeep = Color(light: "#0D765C", dark: "#13A982")
@@ -64,7 +64,7 @@ public enum CliTheme: String, CaseIterable, Identifiable, Sendable {
         switch self {
         case .off:    return nil
         case .claude: return "#D97757"
-        case .grok:   return "#E3B341"
+        case .grok:   return "#E8B84B"
         }
     }
 
@@ -108,9 +108,17 @@ extension Color {
 public extension View {
     /// Applies the terminal theme: sets `NoopVisualStyle.cliTheme` and keys the content so a change
     /// re-renders live. Apply at each app root; the root also forces `.dark` while a theme is active.
+    @ViewBuilder
     func noopCliTheme(_ raw: String) -> some View {
-        NoopVisualStyle.cliTheme = CliTheme.resolve(raw)
-        return self.id("noop.cliTheme.\(raw)")
+        let theme = CliTheme.resolve(raw)
+        let _ = (NoopVisualStyle.cliTheme = theme)
+        let keyed = self.id("noop.cliTheme.\(raw)")
+        // Monospace for every system font that does not pin its own design (StrandFont follows the theme).
+        if #available(iOS 16.1, macOS 13.0, watchOS 9.1, *) {
+            keyed.fontDesign(theme.isActive ? .monospaced : nil)
+        } else {
+            keyed
+        }
     }
 }
 
@@ -138,7 +146,9 @@ public struct NoopPanelSurface: View {
     }
 
     public var body: some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        // Terminal themes draw squarer cards with a crisp, untinted 1px edge.
+        let terminal = NoopVisualStyle.cliTheme.isActive
+        let shape = RoundedRectangle(cornerRadius: terminal ? min(cornerRadius, 8) : cornerRadius, style: .continuous)
         #if os(iOS)
         // Scrolling stacks contain many panels. Layered translucent gradients and blurred shadows
         // multiply their compositing work, so iOS uses one theme-aware fill and a thin tinted rim.
@@ -146,8 +156,9 @@ public struct NoopPanelSurface: View {
         shape
             .fill(NoopVisualStyle.surface)
             .overlay(shape.strokeBorder(
-                tint?.opacity(0.14) ?? NoopVisualStyle.borderHighlight.opacity(elevated ? 0.9 : 0.65),
-                lineWidth: 0.8
+                terminal ? NoopVisualStyle.border
+                         : tint?.opacity(0.14) ?? NoopVisualStyle.borderHighlight.opacity(elevated ? 0.9 : 0.65),
+                lineWidth: terminal ? 1 : 0.8
             ))
             .opacity(surfaceOpacity)
         #else

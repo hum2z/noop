@@ -1209,6 +1209,13 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .tint(StrandPalette.accent)
                     .accessibilityLabel("Terminal theme")
+                    // A terminal look is a plain canvas: drop the day-cycle sky when one is picked.
+                    .onChange(of: cliThemeRaw) { raw in
+                        if CliTheme.resolve(raw).isActive {
+                            showDayCycleBackground = false
+                            skyBehindCards = false
+                        }
+                    }
                 }
                 rowDivider   // #79: the segmented rows sat flush against each other (missing separator)
                 FormRow(label: "Chart colours") {
