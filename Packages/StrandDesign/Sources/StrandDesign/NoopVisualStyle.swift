@@ -7,20 +7,25 @@ import SwiftUI
 // bindings, while cards, gauges, typography, and chrome share one maintainable source of truth.
 
 public enum NoopVisualStyle {
-    // Neutral, low-chroma surfaces sampled from the supplied dark-mode reference.
-    public static let canvas = Color(light: "#F3F4F6", dark: "#1D1E23")
-    public static let surface = Color(light: "#FFFFFF", dark: "#2A2C34")
-    public static let surfaceTop = Color(light: "#FFFFFF", dark: "#30323B")
-    public static let surfaceBottom = Color(light: "#F4F5F7", dark: "#282A31")
-    public static let inset = Color(light: "#E8E9ED", dark: "#23252C")
+    /// The active terminal theme (`CliTheme`). Set at the app root via `.noopCliTheme(_:)`; the surface and
+    /// text tokens below read it when they resolve, so the whole chrome re-skins without per-view plumbing.
+    public static var cliTheme: CliTheme = .off
 
-    public static let border = Color(light: "#D8DAE0", dark: "#373A44")
-    public static let borderHighlight = Color(light: "#FFFFFF", dark: "#4B4E59")
-    public static let divider = Color(light: "#E4E5E9", dark: "#383A43")
+    // Neutral, low-chroma surfaces sampled from the supplied dark-mode reference. Each also carries the
+    // Claude (warm charcoal) and Grok (near-black) dark values used while a terminal theme is active.
+    public static let canvas = Color(light: "#F3F4F6", dark: "#1D1E23", claude: "#1F1E1D", grok: "#0A0A0A")
+    public static let surface = Color(light: "#FFFFFF", dark: "#2A2C34", claude: "#2B2A27", grok: "#161514")
+    public static let surfaceTop = Color(light: "#FFFFFF", dark: "#30323B", claude: "#30302E", grok: "#1C1B19")
+    public static let surfaceBottom = Color(light: "#F4F5F7", dark: "#282A31", claude: "#282724", grok: "#141312")
+    public static let inset = Color(light: "#E8E9ED", dark: "#23252C", claude: "#1A1918", grok: "#0F0E0D")
 
-    public static let primaryText = Color(light: "#17181C", dark: "#F7F7FA")
-    public static let secondaryText = Color(light: "#555861", dark: "#C3C4CA")
-    public static let tertiaryText = Color(light: "#7D808A", dark: "#7D7F88")
+    public static let border = Color(light: "#D8DAE0", dark: "#373A44", claude: "#3E3D39", grok: "#2C2924")
+    public static let borderHighlight = Color(light: "#FFFFFF", dark: "#4B4E59", claude: "#52504A", grok: "#3D3830")
+    public static let divider = Color(light: "#E4E5E9", dark: "#383A43", claude: "#3A3935", grok: "#26231F")
+
+    public static let primaryText = Color(light: "#17181C", dark: "#F7F7FA", claude: "#F5F4EE", grok: "#F3EEE3")
+    public static let secondaryText = Color(light: "#555861", dark: "#C3C4CA", claude: "#C2C0B6", grok: "#BDB4A2")
+    public static let tertiaryText = Color(light: "#7D808A", dark: "#7D7F88", claude: "#85837B", grok: "#7C7466")
 
     public static let mint = Color(light: "#149A78", dark: "#69DDB8")
     public static let mintDeep = Color(light: "#0D765C", dark: "#13A982")
@@ -33,6 +38,80 @@ public enum NoopVisualStyle {
     public static let cardPadding: CGFloat = 16
     public static let itemGap: CGFloat = 12
     public static let sectionGap: CGFloat = 26
+}
+
+/// A terminal-inspired look: a warm dark canvas, a monospace face and a CLI accent. `.claude` follows the
+/// Claude Code terminal (warm charcoal + coral); `.grok` is near-black with gold. The app roots force dark
+/// mode while active. Stored at `CliTheme.storageKey`, applied at each app root via `.noopCliTheme(_:)`.
+public enum CliTheme: String, CaseIterable, Identifiable, Sendable {
+    case off, claude, grok
+
+    public var id: String { rawValue }
+    public static let storageKey = "noop.cliTheme"
+
+    public var label: String {
+        switch self {
+        case .off:    return String(localized: "Off", bundle: .module)
+        case .claude: return "Claude"
+        case .grok:   return "Grok"
+        }
+    }
+
+    public var isActive: Bool { self != .off }
+
+    /// The accent that overrides the user's accent choice while this theme is active.
+    var accentHex: String? {
+        switch self {
+        case .off:    return nil
+        case .claude: return "#D97757"
+        case .grok:   return "#E3B341"
+        }
+    }
+
+    public static func resolve(_ raw: String) -> CliTheme { CliTheme(rawValue: raw) ?? .off }
+}
+
+extension Color {
+    /// A scheme-aware token whose DARK value switches with the active `CliTheme`. All hexes are parsed
+    /// once here; the provider only picks between ready tuples (see `Color(light:dark:)`, #2393).
+    init(light: String, dark: String, claude: String, grok: String) {
+        let c = (light: Color.sRGBComponents(hex: light), dark: Color.sRGBComponents(hex: dark),
+                 claude: Color.sRGBComponents(hex: claude), grok: Color.sRGBComponents(hex: grok))
+        func pickDark() -> (r: Double, g: Double, b: Double, a: Double) {
+            switch NoopVisualStyle.cliTheme {
+            case .off:    return c.dark
+            case .claude: return c.claude
+            case .grok:   return c.grok
+            }
+        }
+        #if os(watchOS)
+        let d = c.dark
+        self.init(.sRGB, red: d.r, green: d.g, blue: d.b, opacity: d.a)
+        #elseif canImport(UIKit)
+        self.init(UIColor { trait in
+            let v = trait.userInterfaceStyle == .dark ? pickDark() : c.light
+            return UIColor(red: CGFloat(v.r), green: CGFloat(v.g), blue: CGFloat(v.b), alpha: CGFloat(v.a))
+        })
+        #elseif canImport(AppKit)
+        self.init(nsColor: NSColor(name: nil) { appearance in
+            let isDark = appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
+            let v = isDark ? pickDark() : c.light
+            return NSColor(srgbRed: CGFloat(v.r), green: CGFloat(v.g), blue: CGFloat(v.b), alpha: CGFloat(v.a))
+        })
+        #else
+        let d = c.dark
+        self.init(.sRGB, red: d.r, green: d.g, blue: d.b, opacity: d.a)
+        #endif
+    }
+}
+
+public extension View {
+    /// Applies the terminal theme: sets `NoopVisualStyle.cliTheme` and keys the content so a change
+    /// re-renders live. Apply at each app root; the root also forces `.dark` while a theme is active.
+    func noopCliTheme(_ raw: String) -> some View {
+        NoopVisualStyle.cliTheme = CliTheme.resolve(raw)
+        return self.id("noop.cliTheme.\(raw)")
+    }
 }
 
 /// Shared card/panel treatment: a solid surface on iOS, gradient and soft elevation elsewhere.

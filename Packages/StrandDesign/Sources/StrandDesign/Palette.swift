@@ -130,11 +130,21 @@ public enum StrandPalette {
     public static var accentChoice: AccentColor = .mint
     /// The custom accent's hex, used only when `accentChoice == .custom`. Set alongside `accentChoice`.
     public static var customAccentHex: String = AccentColor.defaultCustomHex
-    public static var accent: Color { accentChoice.accent }
-    public static var accentHover: Color { accentChoice.accentHover }
-    public static var accentMuted: Color { accentChoice.accentMuted }
+    // An active terminal theme (`CliTheme`) overrides the accent choice with its own CLI colour.
+    public static var accent: Color {
+        if let hex = NoopVisualStyle.cliTheme.accentHex { return Color(hex: hex) }
+        return accentChoice.accent
+    }
+    public static var accentHover: Color {
+        if let hex = NoopVisualStyle.cliTheme.accentHex { return AccentColor.lighten(hex) }
+        return accentChoice.accentHover
+    }
+    public static var accentMuted: Color {
+        if let hex = NoopVisualStyle.cliTheme.accentHex { return Color(hex: hex).opacity(0.18) }
+        return accentChoice.accentMuted
+    }
     /// Focus ring color — the same accent, on both schemes.
-    public static var focusRing: Color { accentChoice.focusRing }
+    public static var focusRing: Color { accent }
     /// Opacity for dimmed/disabled sections (shared so screens don't invent their own value).
     public static let disabledOpacity: Double = 0.45
     /// Liquid-scene activity tint shared by heart-rate feedback and transient sync chrome.

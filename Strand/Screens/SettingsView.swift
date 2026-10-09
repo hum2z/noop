@@ -128,6 +128,8 @@ struct SettingsView: View {
     @AppStorage("appIcon.alt") private var useNavyIcon = false
     // Light/Dark/System theme. Read by both app roots' .preferredColorScheme; default follows the OS.
     @AppStorage(AppearanceMode.storageKey) private var appearanceRaw = AppearanceMode.system.rawValue
+    // Terminal theme (Claude / Grok): warm dark canvas, monospace face, CLI accent. Off by default.
+    @AppStorage(CliTheme.storageKey) private var cliThemeRaw = CliTheme.off.rawValue
     // App-owned copy language. Apple binds a bundle localization at process launch, so this writes the
     // standard AppleLanguages override and takes effect after the user reopens NOOP.
     @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = AppLanguage.system.rawValue
@@ -1194,6 +1196,19 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .tint(StrandPalette.accent)
                     .accessibilityLabel("Theme")
+                }
+                rowDivider
+                FormRow(label: "Terminal theme") {
+                    // Claude / Grok CLI look: forces dark, swaps the canvas, accent and font.
+                    Picker("Terminal theme", selection: $cliThemeRaw) {
+                        ForEach(CliTheme.allCases) { theme in
+                            Text(theme.label).tag(theme.rawValue)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .tint(StrandPalette.accent)
+                    .accessibilityLabel("Terminal theme")
                 }
                 rowDivider   // #79: the segmented rows sat flush against each other (missing separator)
                 FormRow(label: "Chart colours") {

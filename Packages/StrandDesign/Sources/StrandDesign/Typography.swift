@@ -16,8 +16,11 @@ public enum StrandFont {
 
     // MARK: Family
 
+    /// The house face: SF Rounded, or SF Mono while a terminal theme (`CliTheme`) is active.
+    static var design: Font.Design { NoopVisualStyle.cliTheme.isActive ? .monospaced : .rounded }
+
     private static func roundedSystem(_ size: CGFloat, weight: Font.Weight) -> Font {
-        .system(size: size, weight: weight, design: .rounded)
+        .system(size: size, weight: weight, design: design)
     }
 
     // MARK: Scale (§9.2)
@@ -41,25 +44,25 @@ public enum StrandFont {
     }
 
     /// Title1 28 / Bold. Scales with Dynamic Type.
-    public static let title1 = Font.system(.title, design: .rounded, weight: .bold)
+    public static var title1: Font { Font.system(.title, design: design, weight: .bold) }
 
     /// Title2 22 / Semibold. Scales with Dynamic Type.
-    public static let title2 = Font.system(.title2, design: .rounded, weight: .semibold)
+    public static var title2: Font { Font.system(.title2, design: design, weight: .semibold) }
 
     /// Headline 17 / Semibold. Scales with Dynamic Type.
-    public static let headline = Font.system(.headline, design: .rounded, weight: .semibold)
+    public static var headline: Font { Font.system(.headline, design: design, weight: .semibold) }
 
     /// Body 15 / Regular. Scales with Dynamic Type.
-    public static let body = Font.system(.body, design: .rounded, weight: .regular)
+    public static var body: Font { Font.system(.body, design: design, weight: .regular) }
 
     /// Subhead 13. Scales with Dynamic Type.
-    public static let subhead = Font.system(.subheadline, design: .rounded, weight: .regular)
+    public static var subhead: Font { Font.system(.subheadline, design: design, weight: .regular) }
 
     /// Caption 12. Scales with Dynamic Type.
-    public static let caption = Font.system(.caption, design: .rounded, weight: .regular)
+    public static var caption: Font { Font.system(.caption, design: design, weight: .regular) }
 
     /// Footnote 11. Scales with Dynamic Type.
-    public static let footnote = Font.system(.footnote, design: .rounded, weight: .regular)
+    public static var footnote: Font { Font.system(.footnote, design: design, weight: .regular) }
 
     /// Overline 11 / Bold, +1.4 tracking (apply `.tracking(1.4)` at use site;
     /// `overlineText(_:)` does it for you). Sparing ALL-CAPS labels. Scales with Dynamic Type.
@@ -67,7 +70,7 @@ public enum StrandFont {
     /// Also the face for compact status copy in constrained chrome (the Today header's sync capsule),
     /// used there WITHOUT the tracking — that is sentence case, not an overline, and the letter-spacing
     /// is what makes an overline read as one.
-    public static let overline = Font.system(.caption2, design: .rounded, weight: .semibold)
+    public static var overline: Font { Font.system(.caption2, design: design, weight: .semibold) }
 
     /// `overline` at a custom point size — same Helvetica face, weight and Dynamic-Type scaling
     /// (relativeTo `.caption2`), just smaller. Passing 11 returns exactly `.overline`. Lets a caller
@@ -75,12 +78,12 @@ public enum StrandFont {
     public static func overlineScaled(_ size: CGFloat) -> Font {
         #if canImport(UIKit)
         let base = UIFont.systemFont(ofSize: size, weight: .semibold)
-        let descriptor = base.fontDescriptor.withDesign(.rounded) ?? base.fontDescriptor
+        let descriptor = base.fontDescriptor.withDesign(design == .monospaced ? .monospaced : .rounded) ?? base.fontDescriptor
         let rounded = UIFont(descriptor: descriptor, size: size)
         return Font(UIFontMetrics(forTextStyle: .caption2).scaledFont(for: rounded))
         #elseif canImport(AppKit)
         let base = NSFont.systemFont(ofSize: size, weight: .semibold)
-        guard let descriptor = base.fontDescriptor.withDesign(.rounded),
+        guard let descriptor = base.fontDescriptor.withDesign(design == .monospaced ? .monospaced : .rounded),
               let rounded = NSFont(descriptor: descriptor, size: size) else {
             return Font(base)
         }
@@ -103,10 +106,10 @@ public enum StrandFont {
 
     /// Helvetica-Neue body number — for inline live values that should align. Scales with Dynamic
     /// Type alongside its sibling `body`/`caption` labels so a value and its label stay matched.
-    public static let bodyNumber = Font.system(.body, design: .rounded, weight: .medium).monospacedDigit()
+    public static var bodyNumber: Font { Font.system(.body, design: design, weight: .medium).monospacedDigit() }
 
     /// Helvetica-Neue caption number — for small live values (sparklines, chips). Scales with Dynamic Type.
-    public static let captionNumber = Font.system(.caption, design: .rounded, weight: .medium).monospacedDigit()
+    public static var captionNumber: Font { Font.system(.caption, design: design, weight: .medium).monospacedDigit() }
 
     /// Mono at an arbitrary size.
     public static func mono(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
