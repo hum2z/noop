@@ -15,32 +15,37 @@ struct NOOPLiveActivity: Widget {
 
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: NOOPActivityAttributes.self) { context in
-            // Lock Screen / banner presentation.
-            HStack(spacing: 14) {
-                Image(systemName: "waveform.path.ecg")
-                    .font(.title2)
-                    .foregroundStyle(StrandPalette.statusCritical)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(context.attributes.title)
-                        .font(.caption).foregroundStyle(StrandPalette.textSecondary)
-                    Text("\(Self.shownBpm(context).map(String.init) ?? "–") bpm")
-                        .font(.system(size: 26, weight: .bold, design: .rounded))
-                        .foregroundStyle(StrandPalette.textPrimary)
-                }
-                Spacer()
-                // Charge + Effort (#446) on the banner, mirroring the Dynamic Island expanded stats.
-                HStack(spacing: 12) {
-                    if let r = context.state.recovery {
-                        bannerStat(label: "Charge", value: "\(r)%")
+            let terminal = CliTheme.resolve(context.state.theme ?? "")
+            if terminal.isActive {
+                TerminalBanner(theme: terminal, bpm: Self.shownBpm(context), state: context.state)
+            } else {
+                // Lock Screen / banner presentation.
+                HStack(spacing: 14) {
+                    Image(systemName: "waveform.path.ecg")
+                        .font(.title2)
+                        .foregroundStyle(StrandPalette.statusCritical)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(context.attributes.title)
+                            .font(.caption).foregroundStyle(StrandPalette.textSecondary)
+                        Text("\(Self.shownBpm(context).map(String.init) ?? "–") bpm")
+                            .font(.system(size: 26, weight: .bold, design: .rounded))
+                            .foregroundStyle(StrandPalette.textPrimary)
                     }
-                    if let e = context.state.effort {
-                        bannerStat(label: "Effort", value: "\(e)")
+                    Spacer()
+                    // Charge + Effort (#446) on the banner, mirroring the Dynamic Island expanded stats.
+                    HStack(spacing: 12) {
+                        if let r = context.state.recovery {
+                            bannerStat(label: "Charge", value: "\(r)%")
+                        }
+                        if let e = context.state.effort {
+                            bannerStat(label: "Effort", value: "\(e)")
+                        }
                     }
                 }
+                .padding()
+                .activityBackgroundTint(StrandPalette.surfaceBase)
+                .activitySystemActionForegroundColor(StrandPalette.textPrimary)
             }
-            .padding()
-            .activityBackgroundTint(StrandPalette.surfaceBase)
-            .activitySystemActionForegroundColor(StrandPalette.textPrimary)
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -100,4 +105,51 @@ private func statColumn(label: String, value: String) -> some View {
     }
     .multilineTextAlignment(.center)
     .fixedSize()
+}
+
+/// The Lock-Screen banner in a terminal theme (Claude / Grok): a prompt line, the live heart rate as the
+/// command's output, and the day's stats as key/value pairs, in SF Mono on the theme's own canvas.
+private struct TerminalBanner: View {
+    let theme: CliTheme
+    let bpm: Int?
+    let state: NOOPActivityAttributes.ContentState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Text("*").foregroundStyle(theme.accent)
+                Text("~/noop").foregroundStyle(theme.bannerMuted)
+                Spacer()
+                Circle().fill(bpm == nil ? theme.bannerMuted : theme.accent).frame(width: 6, height: 6)
+                Text(bpm == nil ? "offline" : "live").foregroundStyle(theme.bannerMuted)
+            }
+            .font(.system(.caption, design: .monospaced))
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Text(">").foregroundStyle(theme.accent)
+                Text(bpm.map(String.init) ?? "--")
+                    .font(.system(size: 30, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(theme.bannerText)
+                Text("bpm").foregroundStyle(theme.bannerMuted)
+                Spacer()
+            }
+            .font(.system(.body, design: .monospaced))
+            HStack(spacing: 14) {
+                if let s = state.stressTenths { stat("stress", String(format: "%.1f", Double(s) / 10)) }
+                if let e = state.effort { stat("effort", "\(e)") }
+                if let r = state.recovery { stat("charge", "\(r)%") }
+                Spacer()
+            }
+        }
+        .padding()
+        .activityBackgroundTint(theme.bannerCanvas)
+        .activitySystemActionForegroundColor(theme.bannerText)
+    }
+
+    private func stat(_ label: String, _ value: String) -> some View {
+        HStack(spacing: 4) {
+            Text(label).foregroundStyle(theme.bannerMuted)
+            Text(value).foregroundStyle(theme.bannerText)
+        }
+        .font(.system(.caption, design: .monospaced))
+    }
 }

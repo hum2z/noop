@@ -69,6 +69,12 @@ public enum CliTheme: String, CaseIterable, Identifiable, Sendable {
     }
 
     public static func resolve(_ raw: String) -> CliTheme { CliTheme(rawValue: raw) ?? .off }
+
+    // Fixed colours for surfaces drawn outside the app's colour scheme (the Lock Screen banner).
+    public var accent: Color { Color(hex: accentHex ?? "#69DDB8") }
+    public var bannerCanvas: Color { Color(hex: self == .claude ? "#151413" : "#000000") }
+    public var bannerText: Color { Color(hex: self == .claude ? "#F2F0E8" : "#EDEDED") }
+    public var bannerMuted: Color { Color(hex: self == .claude ? "#7F7C73" : "#6B6B6B") }
 }
 
 extension Color {

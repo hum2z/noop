@@ -339,6 +339,13 @@ struct StrandiOSApp: App {
                     watch.activate()
                     await watch.pushLatest(from: model)
                 }
+                // Record live stress + Effort to on-device day files from launch, not only once the Live
+                // screen has been opened.
+                .task {
+                    LiveTraceStore.shared.attach(model.live, restingHR: model.repo.today?.restingHr,
+                                                 avgHrv: model.repo.today?.avgHrv,
+                                                 maxHR: model.profile.hrMax, sex: model.profile.sex)
+                }
         }
         // HealthKit authorization is intentionally NOT requested on launch. The system permission
         // dialog without prior in-app rationale violates Apple HIG / App Review guidance — the user

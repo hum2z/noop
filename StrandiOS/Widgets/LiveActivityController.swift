@@ -3,6 +3,7 @@ import Foundation
 import ActivityKit
 import Combine
 import UIKit
+import StrandDesign
 
 /// Starts, updates, and ends the live-HR Live Activity on the Lock Screen and in the Dynamic Island: the heart rate
 /// while the strap measures it, the dash while it does not. It follows the strap from process start (`follow`).
@@ -150,8 +151,10 @@ final class LiveActivityController {
         // Link down: the dash, never the last number (`bonded` stays true across a disconnect, and keying off it once
         // left a fabricated "live" HR standing). No timed end: a timer in a suspended app fires at its next wake,
         // which is typically the strap coming back — exactly when the banner should stay.
-        let state = NOOPActivityAttributes.ContentState(bpm: connected ? bpm : nil, recovery: recovery,
-                                                        bonded: connected, effort: effort)
+        let state = NOOPActivityAttributes.ContentState(
+            bpm: connected ? bpm : nil, recovery: recovery, bonded: connected, effort: effort,
+            stressTenths: connected ? LiveTraceStore.shared.stress.last.map { Int(($0.value * 10).rounded()) } : nil,
+            theme: UserDefaults.standard.string(forKey: CliTheme.storageKey))
 
         if step == .renew, activity != nil {
             // The fresh banner first, then the old one goes, so the Lock Screen is never without one; if iOS refuses

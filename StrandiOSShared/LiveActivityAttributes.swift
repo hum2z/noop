@@ -13,12 +13,19 @@ public struct NOOPActivityAttributes: ActivityAttributes {
         // Effort / strain on NOOP's 0–100 axis (#446) — one more stat in the Dynamic Island expanded
         // region. OPTIONAL with a nil default so an activity started by an older build still decodes.
         public var effort: Int?
+        /// Live stress (0-3) in tenths, from the Live Trace recorder. Optional so older states decode.
+        public var stressTenths: Int?
+        /// The active terminal theme raw value ("claude" / "grok"), nil or "off" for the standard banner.
+        public var theme: String?
 
-        public init(bpm: Int?, recovery: Int?, bonded: Bool, effort: Int? = nil) {
+        public init(bpm: Int?, recovery: Int?, bonded: Bool, effort: Int? = nil,
+                    stressTenths: Int? = nil, theme: String? = nil) {
             self.bpm = bpm
             self.recovery = recovery
             self.bonded = bonded
             self.effort = effort
+            self.stressTenths = stressTenths
+            self.theme = theme
         }
     }
 
