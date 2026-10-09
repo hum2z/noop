@@ -279,7 +279,7 @@ public enum DaytimeStress {
 
     /// Combined autonomic z-score. HR-up and HRV-down both push it positive — the SAME
     /// directionality as the daily score (RHR up = stress, HRV down = stress).
-    static func rawScore(hr: Double?, meanHR: Double?, sdHR: Double,
+    public static func rawScore(hr: Double?, meanHR: Double?, sdHR: Double,
                          rmssd: Double?, meanRMSSD: Double?, sdRMSSD: Double) -> Double {
         var sum = 0.0
         if let h = hr, let m = meanHR, sdHR > 0.0001 {
@@ -293,7 +293,7 @@ public enum DaytimeStress {
 
     /// Logistic squash of the raw z-sum onto 0–3 (baseline 0 → 1.5). Identical to
     /// StressMath.squash, so an hourly point shares the daily score's scale and bands.
-    static func squash(_ raw: Double) -> Double {
+    public static func squash(_ raw: Double) -> Double {
         let s = 3.0 / (1.0 + exp(-raw))
         return min(max(s, 0), 3)
     }

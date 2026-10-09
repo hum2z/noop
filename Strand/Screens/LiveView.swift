@@ -133,6 +133,8 @@ struct LiveView: View {
                 // `auth OK` — the same "no link yet" slot the WHOOP callout fills.
                 if activeIsOura, ringPhase != .authenticated { ringConnectCallout }
                 bodyConsole
+                // Second-by-second live stress + Effort lines (display-only estimate).
+                LiveTraceCard()
                 // Low-bandwidth fallback note (#80): the radio couldn't sustain the WHOOP 4 R10/R11 raw
                 // realtime burst, so live HR is riding the standard BLE Heart-Rate profile instead. Live HR
                 // still works — this is informational, not an error — so it sits right under the readout in
