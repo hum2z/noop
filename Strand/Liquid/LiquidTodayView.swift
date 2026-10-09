@@ -205,6 +205,8 @@ struct LiquidTodayView: View {
         if selectedDayOffset == 0, let todayKey = repo.today?.day { return todayKey }
         return Repository.localDayKey(selectedLogicalDay)
     }
+    /// The strap model the user picked, so an empty Blood Oxygen tile can say WHOOP 5.0 does not report it.
+    @AppStorage("selectedWhoopModel") private var selectedWhoopModelRaw = WhoopModel.whoop4.rawValue
     /// The DailyMetric shown for the selected day — read from the cache resolved in load() (was an
     /// O(days) `.last(where:)` scan referenced ~23× per body pass; now O(1)).
     private var displayDay: DailyMetric? { cachedDisplayDay }
@@ -1420,10 +1422,15 @@ struct LiquidTodayView: View {
                 : nil
             let spo2 = spo2Real ?? spo2CandidateValue
             ktile(String(localized: "Blood Oxygen"), icon: keyMetricIcon(metric), intText(spo2), "%", StrandPalette.metricCyan, fracOver(spo2, 100), key: spo2CandidateValue != nil ? "spo2_candidate" : "spo2",
-                  caption: spo2CandidateValue != nil ? String(localized: "strap estimate (unverified)") : nil)
+                  caption: spo2CandidateValue != nil ? String(localized: "strap estimate (unverified)")
+                      : spo2Real != nil ? repo.vitalProvenance(key: "spo2", candidateDays: [displayDay?.day, vitalsDay?.day], \.spo2Pct)
+                      : selectedWhoopModelRaw == WhoopModel.whoop5mg.rawValue ? String(localized: "not read by WHOOP 5.0 yet") : nil)
         case .respiratory:
             let resp = displayDay?.respRateBpm ?? vitalsDay?.respRateBpm ?? respDay?.respRateBpm
-            ktile(String(localized: "Respiratory"), icon: keyMetricIcon(metric), resp.map { String(format: "%.1f", locale: AppLanguage.activeLocale, $0) } ?? "—", "rpm", StrandPalette.accent, fracOver(resp, 24), key: "resp_rate")
+            ktile(String(localized: "Respiratory"), icon: keyMetricIcon(metric), resp.map { String(format: "%.1f", locale: AppLanguage.activeLocale, $0) } ?? "—", "rpm", StrandPalette.accent, fracOver(resp, 24), key: "resp_rate",
+                  caption: resp != nil
+                      ? repo.vitalProvenance(key: "resp", candidateDays: [displayDay?.day, vitalsDay?.day, respDay?.day], \.respRateBpm)
+                      : String(localized: "needs a night of beat-to-beat data"))
         case .steps:
             ktile(String(localized: "Steps"), icon: keyMetricIcon(metric), stepsText, "", StrandPalette.chargeColor,
                   fracOver(stepCount, 10000), key: stepsDetailKey, detailMetric: stepsDetailMetric)
