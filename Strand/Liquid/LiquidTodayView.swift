@@ -722,7 +722,8 @@ struct LiquidTodayView: View {
                           onGuide: { guideSection = .effort },
                           maxValue: effortScale == .whoop ? 21 : 100,
                           decimals: effortScale == .whoop ? 1 : 0,
-                          detailRoute: .metric(HeroRingMetric.effort))
+                          detailRoute: liveDashboardEnabled ? .effortDetail(score: effortStrain(displayDay))
+                                                            : .metric(HeroRingMetric.effort))
             HeroScoreCell(label: String(localized: "Rest"), score: restScore, tint: StrandPalette.restColor,
                           animated: dataLoaded, onGuide: { guideSection = .rest },
                           detailRoute: liveDashboardEnabled ? .restDetail(score: restScore) : .metric(HeroRingMetric.rest))

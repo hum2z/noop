@@ -38,6 +38,9 @@ enum TabRoute: Hashable {
     /// The Rest ring's own detail page (score contributors, last night, weekly trends). Carries the
     /// score the ring drew so the page's big ring states the same number.
     case restDetail(score: Double?)
+    /// The Effort ring's own detail page (zones, steps, calories, weekly trends). Carries the raw
+    /// 0-100 Effort the ring drew so the page's big ring states the same number.
+    case effortDetail(score: Double?)
 }
 
 extension View {
@@ -75,6 +78,7 @@ extension View {
             case .hydration: HydrationView()
             case .coupled: CoupledView()
             case .restDetail(let score): RestDetailView(heroScore: score)
+            case .effortDetail(let score): EffortDetailView(heroEffort: score)
             }
         }
     }
