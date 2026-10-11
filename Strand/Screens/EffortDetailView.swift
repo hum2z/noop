@@ -19,6 +19,15 @@ struct EffortDetailView: View {
 
     /// Zone minutes per day key: [z1, z2, z3, z4, z5].
     @State private var zonesByDay: [String: [Double]] = [:]
+    /// Strength minutes per day key: confirmed (a strength-labelled workout) and estimated (an unnamed
+    /// detected workout the coarse classifier calls strength).
+    @State private var strengthByDay: [String: StrengthMinutes] = [:]
+
+    struct StrengthMinutes {
+        var confirmed: Double = 0
+        var estimated: Double = 0
+        var total: Double { confirmed + estimated }
+    }
 
     private var scale: EffortScale { UnitPrefs.resolveEffortScale(effortScaleRaw) }
     private var todayKey: String { Repository.localDayKey(Date()) }
@@ -35,6 +44,7 @@ struct EffortDetailView: View {
                            colors: [StrandPalette.zone1, StrandPalette.zone2, StrandPalette.zone3])
                 zonesChart(title: "HR ZONES 4-5", range: 3..<5,
                            colors: [StrandPalette.zone4, StrandPalette.zone5])
+                strengthChart
                 barChart("STEPS", week { $0.steps.map(Double.init) }, format: { Self.thousands($0) },
                          color: StrandPalette.chargeColor)
                 dotChart("CALORIES (EST.)", week { $0.activeKcalEst }, format: { Self.thousands($0) },
@@ -45,7 +55,10 @@ struct EffortDetailView: View {
         }
         .background(StrandPalette.surfaceBase.ignoresSafeArea())
         .navigationTitle("Effort")
-        .task(id: repo.refreshSeq) { await loadZones() }
+        .task(id: repo.refreshSeq) {
+            await loadStrength()
+            await loadZones()
+        }
     }
 
     // MARK: Score
@@ -92,6 +105,20 @@ struct EffortDetailView: View {
                 Divider().overlay(StrandPalette.hairline)
                 row("Heart rate zones 4-5", todayZones.map(high).map(Self.hm), typical(high).map(Self.hm),
                     up: todayZones.map(high), vs: typical(high))
+                Divider().overlay(StrandPalette.hairline)
+                let strengthToday = strengthByDay[todayKey]
+                let strengthPrior = strengthByDay.filter { $0.key != todayKey }.values.map(\.total)
+                let strengthTyp = strengthPrior.isEmpty ? nil : strengthPrior.reduce(0, +) / Double(strengthPrior.count)
+                row("Strength activity time", strengthToday.map { Self.hm($0.total) } ?? Self.hm(0),
+                    strengthTyp.map(Self.hm), up: strengthToday?.total ?? 0, vs: strengthTyp)
+                if let est = strengthToday?.estimated, est > 0 {
+                    HStack {
+                        Text("incl. \(Self.hm(est)) estimated from heart rate and motion (unverified)")
+                            .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                        Spacer()
+                    }
+                    .padding(.bottom, 8)
+                }
                 Divider().overlay(StrandPalette.hairline)
                 let stepsTyp = mean(pastDays.compactMap { $0.steps.map(Double.init) })
                 row("Steps", todayRow?.steps.map { Self.thousands(Double($0)) }, stepsTyp.map(Self.thousands),
@@ -220,6 +247,99 @@ struct EffortDetailView: View {
                 }
             }
         }
+    }
+
+    private struct StrengthBar: Identifiable {
+        let label: String
+        let kind: String
+        let minutes: Double
+        var id: String { label + kind }
+    }
+
+    private var strengthChart: some View {
+        let keys = weekKeys
+        let bars: [StrengthBar] = keys.flatMap { k -> [StrengthBar] in
+            guard let m = strengthByDay[k.key], m.total > 0 else { return [] }
+            return [StrengthBar(label: k.label, kind: "Logged", minutes: m.confirmed),
+                    StrengthBar(label: k.label, kind: "Estimated", minutes: m.estimated)]
+        }
+        let kinds = ["Logged", "Estimated"]
+        let colors = [StrandPalette.effortColor, StrandPalette.effortColor.opacity(0.45)]
+        return StrandCard {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("STRENGTH ACTIVITY TIME").strandOverline()
+                    Spacer()
+                    ForEach(kinds.indices, id: \.self) { i in
+                        HStack(spacing: 4) {
+                            RoundedRectangle(cornerRadius: 2).fill(colors[i]).frame(width: 8, height: 8)
+                            Text(kinds[i].lowercased()).font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+                        }
+                    }
+                }
+                Chart {
+                    ForEach(bars) { b in
+                        BarMark(x: .value("Day", b.label), y: .value("Minutes", b.minutes), width: .ratio(0.4))
+                            .foregroundStyle(by: .value("Kind", b.kind))
+                    }
+                    ForEach(keys, id: \.key) { k in
+                        PointMark(x: .value("Day", k.label), y: .value("Minutes", strengthByDay[k.key]?.total ?? 0))
+                            .opacity(0)
+                            .annotation(position: .top, spacing: 2) {
+                                Text(Self.hm(strengthByDay[k.key]?.total ?? 0)).font(StrandFont.caption)
+                                    .foregroundStyle(StrandPalette.textSecondary)
+                            }
+                    }
+                }
+                .chartForegroundStyleScale(domain: kinds, range: colors)
+                .chartLegend(.hidden)
+                .chartXScale(domain: keys.map(\.label))
+                .chartYAxis(.hidden)
+                .chartXAxis { dayAxis }
+                .frame(height: 130)
+                Text("Logged = workouts named strength / weights. Estimated = unnamed detected workouts that look like lifting (unverified).")
+                    .font(StrandFont.caption).foregroundStyle(StrandPalette.textTertiary)
+            }
+        }
+    }
+
+    /// Workouts whose name already says strength.
+    static func isStrengthSport(_ sport: String) -> Bool {
+        let s = sport.lowercased()
+        return s.contains("strength") || s.contains("weight") || s.contains("lift")
+            || s.contains("crossfit") || s.contains("functional")
+    }
+
+    /// Workouts nobody named, which the classifier may label.
+    static func isUnnamedSport(_ sport: String) -> Bool {
+        ["detected", "activity", "workout", "other", ""].contains(sport.lowercased())
+    }
+
+    private func loadStrength() async {
+        let cal = Calendar.current
+        let weekStart = cal.date(byAdding: .day, value: -6, to: cal.startOfDay(for: Date())) ?? Date()
+        let rows = await repo.workoutRows(days: 8).filter { $0.startTs >= Int(weekStart.timeIntervalSince1970) }
+        let restingByDay = Dictionary(repo.days.map { ($0.day, $0.restingHr) }, uniquingKeysWith: { _, last in last })
+        var result: [String: StrengthMinutes] = [:]
+        for w in rows where w.endTs > w.startTs {
+            let key = Repository.localDayKey(Date(timeIntervalSince1970: TimeInterval(w.startTs)))
+            let minutes = Double(w.endTs - w.startTs) / 60
+            if Self.isStrengthSport(w.sport) {
+                result[key, default: StrengthMinutes()].confirmed += minutes
+            } else if Self.isUnnamedSport(w.sport) {
+                let hr = await repo.hrSamples(from: w.startTs, to: w.endTs, limit: 20_000)
+                let gravity = await repo.gravitySamplesUnion(from: w.startTs - 60, to: w.endTs)
+                guard let features = WorkoutTypeFeatureExtractor.extract(
+                    hr: hr, gravity: gravity, steps: [], start: w.startTs, end: w.endTs,
+                    restingHR: restingByDay[key].flatMap { $0.map { Double($0) } },
+                    maxHR: Double(profile.hrMax)) else { continue }
+                let p = WorkoutTypeClassifier.classify(features)
+                if p.predictedClass == .strength, p.confidence >= 0.5 {
+                    result[key, default: StrengthMinutes()].estimated += minutes
+                }
+            }
+        }
+        strengthByDay = result
     }
 
     private func dotChart(_ title: String, _ data: [DayValue], format: @escaping (Double) -> String,
