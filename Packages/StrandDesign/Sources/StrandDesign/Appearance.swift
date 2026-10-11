@@ -364,7 +364,9 @@ private struct AdditiveBloom: ViewModifier {
     func body(content: Content) -> some View {
         // Dialed back (0.55) — the full-strength additive bloom read as too much glow against the
         // crisper design language. Still present on dark for depth, just restrained.
-        if scheme == .dark { content.blendMode(.plusLighter).opacity(0.55) }
+        // Terminal themes are flat: no additive glow at all.
+        if NoopVisualStyle.cliTheme.isActive { content.opacity(0) }
+        else if scheme == .dark { content.blendMode(.plusLighter).opacity(0.55) }
         else { content.opacity(0) }
     }
 }

@@ -371,6 +371,7 @@ struct LiquidTodayView: View {
                     ForEach(sectionOrder) { section in
                         switch section {
                         case .hero:
+                            if NoopVisualStyle.cliTheme.isActive, selectedDayOffset == 0 { TerminalPromptHeader() }
                             heroCard
                             if chargeLegacyRRGap { ChargeLegacyRRGapNote() }
                             // Live dashboard: whole-day heart rate, stress + Effort and last night's sleep,
@@ -2266,7 +2267,32 @@ private struct HeroScoreCell: View {
     /// as three stacked elements rather than a branch.
     @ViewBuilder
     private var gaugeView: some View {
-        let gauge = LiquidScoreGauge(
+        if let detailRoute {
+            NavigationLink(value: detailRoute) { gaugeBody }
+                .buttonStyle(LiquidPressStyle())
+                // The ring is what shows the NUMBER, so its spoken label carries the number too. Without
+                // this a VoiceOver user hears only the metric name on the element displaying the value,
+                // while the label below it reads the score, which is backwards.
+                .accessibilityLabel(Text("\(label), \(spokenScore)"))
+                .accessibilityHint(Text("Opens the trend and readings"))
+        } else {
+            gaugeBody
+        }
+    }
+
+    /// The gauge itself: a flat ring under a terminal theme (`CliTheme`), the liquid vessel otherwise.
+    @ViewBuilder
+    private var gaugeBody: some View {
+        if NoopVisualStyle.cliTheme.isActive {
+            TerminalScoreRing(score: score, tint: tint, diameter: Self.vesselDiameter,
+                              maxValue: maxValue, decimals: decimals)
+        } else {
+            liquidGauge
+        }
+    }
+
+    private var liquidGauge: some View {
+        LiquidScoreGauge(
             score: score,
             tint: tint,
             diameter: Self.vesselDiameter,
@@ -2275,17 +2301,6 @@ private struct HeroScoreCell: View {
             decimals: decimals,
             tapPassesThrough: detailRoute != nil
         )
-        if let detailRoute {
-            NavigationLink(value: detailRoute) { gauge }
-                .buttonStyle(LiquidPressStyle())
-                // The ring is what shows the NUMBER, so its spoken label carries the number too. Without
-                // this a VoiceOver user hears only the metric name on the element displaying the value,
-                // while the label below it reads the score, which is backwards.
-                .accessibilityLabel(Text("\(label), \(spokenScore)"))
-                .accessibilityHint(Text("Opens the trend and readings"))
-        } else {
-            gauge
-        }
     }
 
     /// The score as VoiceOver should say it, matching the label row's own phrasing.
@@ -2318,6 +2333,56 @@ private struct HeroScoreCell: View {
     }
 }
 
+
+/// The flat score ring the terminal themes draw in place of the liquid vessel: a track, a tinted arc and
+/// the number in the middle. Same score, scale and decimals as the vessel it replaces.
+private struct TerminalScoreRing: View {
+    let score: Double?
+    let tint: Color
+    let diameter: CGFloat
+    let maxValue: Double
+    let decimals: Int
+
+    var body: some View {
+        let frac = min(max((score ?? 0) / maxValue, 0), 1)
+        ZStack {
+            Circle().stroke(StrandPalette.surfaceInset, lineWidth: 7)
+            Circle()
+                .trim(from: 0, to: CGFloat(frac))
+                .stroke(tint, style: StrokeStyle(lineWidth: 7, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+            Text(score.map { decimals > 0
+                    ? String(format: "%.\(decimals)f", locale: AppLanguage.activeLocale, $0)
+                    : String(Int($0.rounded())) } ?? "—")
+                .font(StrandFont.number(diameter * 0.26, weight: .semibold))
+                .foregroundStyle(StrandPalette.textPrimary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+        }
+        .frame(width: diameter * 0.82, height: diameter * 0.82)
+        .frame(width: diameter, height: diameter)
+    }
+}
+
+/// The terminal themes' prompt line over Today: `* ~/noop  today · <date>  ● live`.
+private struct TerminalPromptHeader: View {
+    @EnvironmentObject private var live: LiveState
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Text("*").foregroundStyle(StrandPalette.accent)
+            Text("~/noop").foregroundStyle(StrandPalette.textTertiary)
+            Text("today · \(Date().formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated)).lowercased())")
+                .foregroundStyle(StrandPalette.textTertiary)
+            Spacer()
+            Circle().fill(live.connected ? StrandPalette.accent : StrandPalette.textTertiary).frame(width: 6, height: 6)
+            Text(live.connected ? "live" : "offline")
+                .foregroundStyle(live.connected ? StrandPalette.accent : StrandPalette.textTertiary)
+        }
+        .font(StrandFont.caption)
+        .padding(.horizontal, 4)
+    }
+}
 
 // MARK: - Scene controls (LiveState-isolated leaves)
 
