@@ -205,6 +205,8 @@ struct LiquidTodayView: View {
         if selectedDayOffset == 0, let todayKey = repo.today?.day { return todayKey }
         return Repository.localDayKey(selectedLogicalDay)
     }
+    /// Whether the live dashboard block renders under the hero (default ON).
+    @AppStorage(LiveDashboardPrefs.enabledKey) private var liveDashboardEnabled = true
     /// The strap model the user picked, so an empty Blood Oxygen tile can say WHOOP 5.0 does not report it.
     @AppStorage("selectedWhoopModel") private var selectedWhoopModelRaw = WhoopModel.whoop4.rawValue
     /// The DailyMetric shown for the selected day — read from the cache resolved in load() (was an
@@ -371,6 +373,9 @@ struct LiquidTodayView: View {
                         case .hero:
                             heroCard
                             if chargeLegacyRRGap { ChargeLegacyRRGapNote() }
+                            // Live dashboard: whole-day heart rate, stress + Effort and last night's sleep,
+                            // moving while the strap streams. Today only; Settings → Appearance turns it off.
+                            if liveDashboardEnabled, selectedDayOffset == 0 { LiveDashboardCards() }
                         case .liveSession: if liveSessionsBeta { liveSessionStartRow }
                         case .synthesis: synthesisSection
                         case .keyMetrics: keyMetricsSection

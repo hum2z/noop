@@ -130,6 +130,8 @@ struct SettingsView: View {
     @AppStorage(AppearanceMode.storageKey) private var appearanceRaw = AppearanceMode.system.rawValue
     // Terminal theme (Claude / Grok): warm dark canvas, monospace face, CLI accent. Off by default.
     @AppStorage(CliTheme.storageKey) private var cliThemeRaw = CliTheme.off.rawValue
+    // Live dashboard block under Today's rings (heart rate, stress + Effort, sleep). Default ON.
+    @AppStorage(LiveDashboardPrefs.enabledKey) private var liveDashboardEnabled = true
     // App-owned copy language. Apple binds a bundle localization at process launch, so this writes the
     // standard AppleLanguages override and takes effect after the user reopens NOOP.
     @AppStorage(AppLanguage.storageKey) private var appLanguageRaw = AppLanguage.system.rawValue
@@ -1196,6 +1198,13 @@ struct SettingsView: View {
                     .pickerStyle(.menu)
                     .tint(StrandPalette.accent)
                     .accessibilityLabel("Theme")
+                }
+                rowDivider
+                FormRow(label: "Live dashboard on Today") {
+                    Toggle("Live dashboard on Today", isOn: $liveDashboardEnabled)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .tint(StrandPalette.accent)
                 }
                 rowDivider
                 FormRow(label: "Terminal theme") {
